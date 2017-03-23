@@ -10,6 +10,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.special as sp
+import scipy
 
 # Constants
 ALPHA=1./137.036
@@ -39,7 +40,7 @@ def radius(A):
 def gamma_rel(Z):
     return math.sqrt(1-(ALPHA*Z)**2)
 
-#
+# Relativistic velocity
 def beta_rel(W):
     E = float(W*ELECTRON_MASS)
     p = math.sqrt(E**2 - ELECTRON_MASS**2)
@@ -72,16 +73,13 @@ def complexGamma(z):
 
 # Normalizing spectrum to 1
 def normalize(x_values, y_values):
-    integral = 0
-    for i in range(1,len(x_values)):
-        integral = integral + (y_values[i]+y_values[i-1])/2*(x_values[i]-x_values[i-1])
-    print integral
+    integral = scipy.integrate.simps(y_values,x_values)
     normalized_values = []    
     for item in y_values:
         normalized_values.append(item/float(integral))
     result = normalized_values
     return result
-    
+
 #class Nucleus:
 #class Decay:
     
@@ -217,9 +215,9 @@ def B(W, endpoint, TD):
     elif TD==11 or TD==20:
             result=0.6 *(mu_V-0.5)/(NUCLEON_MASS*LAMBDA)*((pe**2+Enu**2)*(Ee*beta**2 - Enu)+2*beta**2 *Enu*Ee*(Enu-Ee)/3)/(pe**2+Enu**2 - 4*beta*Enu*Ee/3)
 #        elif TD==21 or TD==30:
-#            Space_factor=pnu**4+pe**4+10/3*(pe*pnu)**2
+#            shape=pnu**4+pe**4+10/3*(pe*pnu)**2
 #        elif TD==31 or TD==40:
-#            Space_factor=pnu**6+7*(pnu**4*pe**2+pnu**2*pe**4)+pe**6
+#            shape=pnu**6+7*(pnu**4*pe**2+pnu**2*pe**4)+pe**6
     else:
         result = 0
     result = result + 1
@@ -234,10 +232,165 @@ def fermi(Z,W,A):
     R = radius(A)
     result = 4*(2*p*R)**(2*gamma-2)*np.exp(PI*ALPHA*Z*W/p)*np.abs(complexGamma(gamma + 1j*ALPHA*Z*W/p))**2/(math.gamma(2*gamma+1))**2
     return result
-    
-#def beta_spectrum(A,Z,endpoint,decayType,branching,de):
-#    for i in range
-  
-  
-#def total_spectrum():
-    
+
+#def beta_spectrum(decay,de):#(A,Z,endpoint,decay_type,branching,de):
+#    kinetic_energies = []
+#    values = []
+#    for i in range(1,int(endpoint/de)+1):
+#        W_e = i*de/ELECTRON_MASS + 1
+#        W_0 = endpoint/ELECTRON_MASS+1
+#        W_nu = W_0-W_e
+#        p_e = beta_rel(W_e)*W_e
+#        p_nu = W_nu
+#        kinetic_energies.append(i*de*1000)
+#        F = fermi(Z+1,W_e,A)
+#        if decay_type==0: 
+#            shape=1        
+#        elif decay_type==10:
+#            shape=p_nu**2+p_e**2+2*p_nu*p_e**2/W_e
+#        elif decay_type==11 or decay_type==20:
+#            shape=p_nu**2+p_e**2
+#        elif decay_type==21 or decay_type==30:
+#            shape=p_nu**4+p_e**4+10/3*(p_e*p_nu)**2
+#        elif decay_type==31 or decay_type==40:
+#            shape=p_nu**6+7*(p_nu**4*p_e**2+p_nu**2*p_e**4)+p_e**6
+#        corrections = L0(Z,A,W_e)*S(Z,W_e)*R_A(A,endpoint,W_e)*C_A(Z,A,W_e,endpoint)*B(W_e,endpoint,decay_type)*G_e(Z,W_e,endpoint)
+#        N = shape*corrections*(W_e-W_0)**2*W_e*p_e*F
+#        values.append(N)
+#    result = Spectrum(kinetic_energies, normalize(kinetic_energies,values))
+#    return result
+def gauss(mu,sigma,x):
+    result = 1./(math.sqrt(2.*PI)*sigma)*np.exp(-np.power((x - mu)/sigma, 2.)/2)
+    return result
+
+def diffuse(spectrum, sigma0, de):
+    energies =[]
+    values = []
+    #i=0
+    for i in range(int(spectrum.E[0]/de),int(spectrum.E[-1]/de)+1):
+        energy = i*de
+        sigma = sigma0*math.sqrt(energy)
+        for j in range(int((energy-5*sigma)/de), int((energy+5*sigma)/de)+1):
+            muteE = j*de
+            energies.append(muteE)
+            value = spectrum.E[j]*gauss(energy, sigma, muteE)
+            values.append[value]
+        
+        
+    scipy.integrate.simps(spectrum)
+    result = Spectrum(energies, values)
+    return result
+
+
+class Spectrum:
+    def __init__(self,energies,values):
+        self.E = energies
+        self.N = values
+    def view(self):
+        for i in range(0,len(self.E)):
+            print self.E[i], self.N[i]
+
+class Decay:
+    def __init__(self,A,Z,endpoint,decay_type,branching, start = 0):
+        self.A = A
+        self.Z = Z
+        self.endpoint = endpoint
+        self.decay_type = decay_type
+        self.branching = branching
+        self.start = start
+        
+    def beta_spectrum(self,de):#(A,Z,endpoint,decay_type,branching,de):
+        kinetic_energies = []
+        values = []
+        for i in range(int(self.start/de)+1,int(self.endpoint/de)+1):
+            W_e = i*de/ELECTRON_MASS + 1
+            W_0 = self.endpoint/ELECTRON_MASS+1
+            W_nu = W_0-W_e
+            p_e = beta_rel(W_e)*W_e
+            p_nu = W_nu
+            kinetic_energies.append(i*de*1000)
+            F = fermi(self.Z+1,W_e,self.A)
+            if self.decay_type==0: 
+                shape=1        
+            elif self.decay_type==10:
+                shape=p_nu**2+p_e**2+2*p_nu*p_e**2/W_e
+            elif self.decay_type==11 or self.decay_type==20:
+                shape=p_nu**2+p_e**2
+            elif self.decay_type==21 or self.decay_type==30:
+                shape=p_nu**4+p_e**4+10/3*(p_e*p_nu)**2
+            elif self.decay_type==31 or self.decay_type==40:
+                shape=p_nu**6+7*(p_nu**4*p_e**2+p_nu**2*p_e**4)+p_e**6
+            corrections = L0(self.Z,self.A,W_e)*S(self.Z,W_e)*R_A(self.A,self.endpoint,W_e)*C_A(self.Z,self.A,W_e,self.endpoint)*B(W_e,self.endpoint,self.decay_type)*G_e(self.Z,W_e,self.endpoint)
+            N = shape*corrections*(W_e-W_0)**2*W_e*p_e*F
+            values.append(N)
+        result = Spectrum(kinetic_energies, normalize(kinetic_energies,values))
+        for i in range(0, len(result.N)):
+            values[i] = result.N[i]*self.branching
+        result = Spectrum(kinetic_energies, values)
+        return result
+        
+#    def get_spectrum(self,de):
+#        return self.beta_spectrum(self,de)
+        
+        
+        
+class Isotope:
+    def __init__(self,decays):
+        self.decays = decays
+    def spectrum(self,de):
+        total_N = []
+        total_E = []
+### list version
+#        #merge
+#        for decay in self.decays:
+#            for i in range(0,len(decay.beta_spectrum(de).E)-1):
+#                total_E.append(decay.beta_spectrum(de).E[i])
+#                total_N.append(decay.beta_spectrum(de).N[i])
+##            total_E = total_E + decay.beta_spectrum(de).E
+##            total_N = total_N + decay.beta_spectrum(de).N
+#        temp_E = total_E
+#        temp_N = total_N
+#        #Spectrum(temp_E,temp_N).view()
+#        # exclude repeats in E
+#        for E in total_E:
+#            while temp_E.count(E)> 1:
+#                temp = temp_N[temp_E.index(E)]
+#                temp_E.pop(temp_E.index(E))
+#                temp_N.pop(temp_E.index(E))
+#                temp_N[temp_E.index(E)] = temp_N[temp_E.index(E)] + temp
+#        #Spectrum(temp_E,temp_N).view()
+#        total_E = temp_E
+#        total_N = temp_N
+#        # sort E and N
+#        k = len(total_E)-1
+#        while k > 0:
+#            for i in range(0, k):
+#                if temp_E[i]>temp_E[i+1]:
+#                    e = temp_E[i]
+#                    n = temp_N[i]
+#                    temp_E[i] = temp_E[i+1]
+#                    temp_N[i] = temp_N[i+1]
+#                    temp_E[i+1] = e
+#                    temp_N[i+1] = n
+#            k = k-1
+#                
+#        total_E = temp_E
+#        total_N = temp_N        
+### end list version
+### dictionary version
+        d = {}
+        for decay in self.decays:
+            for e in decay.beta_spectrum(de).E:
+                n = decay.beta_spectrum(de).E.index(e)
+                if e in d:
+                    d[e] = d[e] + decay.beta_spectrum(de).N[n]
+                else:
+                    d[e] = decay.beta_spectrum(de).N[n]
+
+        
+        total_E = sorted(d.keys())
+        total_N = [d[i] for i in total_E]
+### end dictionary version         
+
+        return Spectrum(total_E, total_N)
+
